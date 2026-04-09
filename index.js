@@ -1,9 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-
-puppeteer.use(StealthPlugin());
 
 const app = express();
 app.use(cors());
@@ -13,56 +9,35 @@ app.get('/api/buscar-preco', async (req, res) => {
     const ingrediente = req.query.nome;
     if (!ingrediente) return res.status(400).json({ erro: 'Informe o nome.' });
 
-    let browser;
+    console.log(`\n⚡ Buscando via API do Mercado Livre: ${ingrediente}`);
+
     try {
-        // AJUSTE PARA O RENDER: headless: true e flags de segurança do Linux
-        browser = await puppeteer.launch({ 
-            headless: true, 
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--single-process',
-                '--disable-gpu'
-            ] 
-        }); 
+        // Usa a API pública e oficial do Mercado Livre (porta dos fundos, sem bloqueios!)
+        // O fetch nativo do Node.js faz a busca instantaneamente sem abrir navegador
+        const urlAPI = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(ingrediente + ' supermercado')}`;
         
-        const page = await browser.newPage();
-        const urlBusca = `https://lista.mercadolivre.com.br/supermercado/${encodeURIComponent(ingrediente)}`;
-        
-        await page.goto(urlBusca, { waitUntil: 'domcontentloaded' });
+        const resposta = await fetch(urlAPI);
+        const dados = await resposta.json();
 
-        try {
-            await page.waitForSelector('.andes-money-amount__fraction', { timeout: 5000 });
-        } catch(e) {}
-
-        const precoExtraido = await page.evaluate(() => {
-            const fracoesDePreco = Array.from(document.querySelectorAll('.andes-money-amount__fraction'));
-            if (fracoesDePreco.length > 0) {
-                let reais = fracoesDePreco[0].innerText.replace(/\./g, '');
-                let centavos = '00';
-                const elementoPai = fracoesDePreco[0].closest('.andes-money-amount');
-                if(elementoPai) {
-                    const elemCentavos = elementoPai.querySelector('.andes-money-amount__cents');
-                    if (elemCentavos) centavos = elemCentavos.innerText;
-                }
-                return parseFloat(`${reais}.${centavos}`);
-            }
-            return null;
-        });
-
-        res.json({ ingrediente, preco: precoExtraido });
+        // Verifica se a API retornou algum produto na lista (results)
+        if (dados.results && dados.results.length > 0) {
+            // Pega o preço (price) do primeiro produto da lista
+            const precoExato = dados.results[0].price;
+            
+            console.log(`✅ Sucesso! Preço encontrado: R$ ${precoExato}`);
+            res.json({ ingrediente, preco: precoExato });
+        } else {
+            console.log(`❌ Preço não encontrado na API.`);
+            res.json({ ingrediente, preco: null, erro: "Preço não encontrado" });
+        }
 
     } catch (erro) {
-        res.status(500).json({ erro: 'Erro no servidor.' });
-    } finally {
-        if (browser) await browser.close(); 
+        console.error(`❌ Erro no servidor:`, erro.message);
+        res.status(500).json({ erro: 'Falha na conexão com a API.' });
     }
 });
 
-// O Render define a porta automaticamente, por isso usamos process.env.PORT
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Servidor online na porta ${PORT}`));
+app.listen(PORT, () => {
+    console.log(`🚀 Servidor API super rápido ativo na porta ${PORT}`);
+});
