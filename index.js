@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const https = require('https'); // Módulo blindado e nativo do Node.js
+const https = require('https'); 
 
 const app = express();
 app.use(cors());
@@ -12,21 +12,21 @@ app.get('/api/buscar-preco', (req, res) => {
 
     console.log(`\n⚡ Buscando na API oficial: ${ingrediente}`);
 
-    const urlAPI = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(ingrediente + ' supermercado')}`;
+    // CORREÇÃO: Removi a palavra "supermercado" para a API achar o produto pelo nome exato
+    const urlAPI = `https://api.mercadolibre.com/sites/MLB/search?q=${encodeURIComponent(ingrediente)}`;
 
     https.get(urlAPI, (respostaAPI) => {
         let dados = '';
 
-        // Vai recebendo as informações da API aos poucos
         respostaAPI.on('data', (pedaco) => {
             dados += pedaco;
         });
 
-        // Quando terminar de baixar a resposta
         respostaAPI.on('end', () => {
             try {
                 const resultadoJSON = JSON.parse(dados);
                 
+                // Se a API do Mercado Livre devolver uma lista com pelo menos 1 produto
                 if (resultadoJSON.results && resultadoJSON.results.length > 0) {
                     const precoExato = resultadoJSON.results[0].price;
                     console.log(`✅ Sucesso! Preço: R$ ${precoExato}`);
